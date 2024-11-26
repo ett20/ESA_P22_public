@@ -1,0 +1,431 @@
+---
+title: 'Practical 22: Global controls on stream chemistry and the GLORICH database'
+author: "ETT"
+date: "`r Sys.Date()`"
+output: 
+  tint::tintPdf:
+    keep_tex: TRUE
+    extra_dependencies: ["mhchem"]
+classoption: x11names
+fig_caption: yes
+toc: false
+link-citations: yes
+bibliography: 
+  EnhancedweatheringPrac.bib
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+library(ggplot2)
+library(readxl)
+library(plotly)
+library(reshape2)
+library(gtools)
+library(MASS)
+library(ggridges)
+library(pracma)
+library(viridis)
+library(colorspace)
+library(dplyr)
+library(tidyr)
+library(sf)
+library(rmapshaper)
+
+#library(formatR)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, echo = FALSE, cache=FALSE,warning = FALSE, message = FALSE)
+options(htmltools.dir.version = FALSE)
+```
+
+
+
+\newcommand{\mathalert}[1]{\textcolor{red}{\mathbf{#1}}}
+
+```{=tex}
+\marginnote{This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.  It is similar to a jupyter notebook that you might be more familiar with.  You can both explore the code, and also compile the final document to pdf output.  This should provide you with some familiarisation of "R", as well as the science.}
+```
+\noindent One of the main controls on the composition of terrestrial fresh waters is the rocks through/over which the waters drain. You task in today's practical is to become familiar with the largest available database of natural river waters, and evaluate the lithological control on these waters.
+
+\noindent Note the GLORICH database is **LARGE**. There are measurements of 1.27 million river waters. The data is supplied as three separate files as comma delimited values (**.csv**) format. A spreadsheet environment could be used to open this type of file, but some spreadsheet environments will not be able to cope this many lines of data.
+
+\noindent  This is an opportunity to become more familiar with a coding environment which can be intimidating. All of the coding itself is done for you. All you actually need to do is to run the code (which might be intimidating in itself). We are here to help with this. The snippets of code provided, might serve as **cookbook** examples for the future.
+
+\noindent  DON'T EXPECT TO UNDERSTAND ALL THE CODE IN THIS ONE PRACTICAL.  THAT WOULD BE ANALAGOUS TO TRYING TO LEARN A FOREIGN LANGUAGE IN 2 HOURS.
+
+# This practical will take place in the Galson computer lab.  First off, login to Ubuntu. Navigate to moodle in a web browser. Download the **entire folder** called Practical 2. This will download as a zipped or compressed folder. Move this folder to you home directory, and unzip it. This folder contains a series of sub-folders that contain the data base. It also contains a file called **Practical22.Rmd**. Open this file using the RStudio App.
+
+# TASK: Read in the main data base by running the chunk of code "**Read in the GLORICH database"**.
+
+```{r Read in the GLORICH database, echo=FALSE, include=FALSE}
+Glorich<-read.csv("Glorich_V01_CSV_plus_Shapefiles_2019_05_24/hydrochemistry.csv")
+dim(Glorich)
+head(Glorich)
+```
+
+# TASK: Take a quick look at the data by running the chunk of code "**Head Glorich".** 
+
+```{r Head Glorich, echo=FALSE, include=FALSE}
+head(Glorich)
+```
+
+# TASK: Check how many columns and rows you have in the database by running the chunk of code "**Dim Glorich".  Hopefully this will make it clear why we can't do this in a spreadsheet.**
+
+```{r Dim Glorich, echo=FALSE, include=FALSE}
+dim(Glorich)
+```
+
+\noindent Note that the column *STAT_ID* corresponds to the station ID (the named or code location of where the sample was collected). Also note that many of the entries seem to be empty for the chemical data.
+
+# TASK: To reduce the file size, select only the columns that will interest us for today's practical by running the chunk of code "**Select cols Glorich"**
+
+```{r Select cols Glorich, echo=FALSE, include=FALSE}
+colnames(Glorich)
+Glorich<-Glorich%>%dplyr::select(STAT_ID,RESULT_DATETIME,SAMPLE_TIME_DESC,SAMPLING_MODE,Ref,pH,HCO3,Ca,Mg,Na,K,SiO2,Cl,SO4,NO3)
+```
+
+\noindent The catchment outlines (i.e., a map) are also provided as part of the GloRICH database in ERSI simple features format (also referred to as shape files). You may have used some of these files if you are familiar with the QGIS or software (or even Google maps or Google Earth). This is useful to be able to make of where the data is from.
+
+# TASK:  Read in the ERSI shape files
+
+```{r Read GLorich shape files, echo=FALSE, include=FALSE}
+path<-"Shapes_GloRiCh"
+Glorich_shape <- st_read(dsn=path, layer="Catchments_v1")
+Glorich_shape<-Glorich_shape%>%rename("STAT_ID"="Stat_Id")
+```
+
+# TASK: Take a look at the structure of the ERSI "simple features" file by running the chunk below. It is useful to know a little about the structure of ERSI shape files to help understand how GIS works. Ask a question if you want to know more about this type of file. It really helps demystify some of the black box nature of GIS to understand the file structure. Note that the column *STAT_ID* corresponds to the station ID as with the main chemical database file.
+
+# TASK Reduce the resolution of sf files to increase the plotting speed by running the chunk of code "Simplify shape files"
+
+```{r Simplify shape files to make the plotable, echo=FALSE, include=FALSE}
+Glorich_shape<-st_simplify(Glorich_shape, dTolerance = 30000)
+#Glorich_simple<-Glorich_simple%>%distinct(STAT_ID, .keep_all=TRUE)
+```
+
+# TASK: Run the chunk of code "Make Glorich Global Map" to make a global map showing where the data is from.
+
+```{r Make Glorich Global Map, fig.fullwidth=TRUE, fig.cap="Map showing GLORICH database", out.width = "100%", warning=FALSE, message=FALSE}
+#1) Read in continents from file
+continents<-st_read("continent-poly/Continents.shp")
+
+
+ggplot(NULL)+
+  geom_sf(data=continents, aes(alpha=0.1), fill="black", size=0.01)+
+  geom_sf(data=Glorich_shape, aes(alpha=1), fill="black", size=0.01)+
+  theme(legend.position="none")
+
+```
+
+# TASK: Calculate the NICB for the GLORICH database.  You can do this by running the chunk "NICB".  Make sure you understand this formula.
+
+```{r NICB, echo=FALSE, include=FALSE}
+Glorich<-Glorich%>%mutate(NCIB=(2*Ca+2*Mg+Na+K-2*SO4-Cl-NO3-HCO3)/(2*Ca+2*Mg+Na+K+2*SO4+Cl+NO3+HCO3))
+```
+
+# TASK: Plot a histogram of the NCIB to check its distribution by running the chunk "NICB histogram".
+
+
+
+```{r NICB histogram, fig.margin = TRUE, warning=FALSE, fig.pos = "-3cm", fig.cap="Histogram of NCIB"}
+
+# Define white theme (handouts) ------------------------------------------------------
+theme_white = function(base_size = 18, base_family = "") {
+  
+  theme_grey(base_size = base_size, base_family = base_family) %+replace%
+    
+    theme(
+      # Specify axis options
+      axis.line = element_blank(),  
+      axis.text.x = element_text(size = base_size*0.8, color = "black", lineheight = 0.9, face = "bold"),  
+      axis.text.y = element_text(size = base_size*0.8, color = "black", lineheight = 0.9, face = "bold"),  
+      axis.ticks = element_line(color = "black", size  =  0.2),  
+      axis.title.x = element_text(size = base_size, color = "black", margin = margin(0, 10, 0, 0), face = "bold"),  
+      axis.title.y = element_text(size = base_size, color = "black", angle = 90, margin = margin(0, 10, 0, 0), face = "bold"),  
+      axis.ticks.length = unit(0.3, "lines"),   
+      # Specify legend options
+      legend.background = element_rect(color = NA, fill = "white"),  
+      legend.key = element_rect(color = "black",  fill = "white"),  
+      legend.key.size = unit(1.2, "lines"),  
+      legend.key.height = NULL,  
+      legend.key.width = NULL,      
+      legend.text = element_text(size = base_size*0.8, color = "black"),  
+      legend.title = element_text(size = base_size*0.8, face = "bold", hjust = 0, color = "black"),  
+      legend.position = "right",  
+      legend.text.align = NULL,  
+      legend.title.align = NULL,  
+      legend.direction = "vertical",  
+      legend.box = NULL, 
+      # Specify panel options
+      panel.background = element_rect(fill = "white", color  =  NA),  
+      panel.border = element_rect(fill = NA, color = "black"),  
+      panel.grid.major = element_line(color = "grey35", size=0.1),  
+      panel.grid.minor = element_line(color = "grey20", size=0.1),  
+      panel.margin = unit(0.5, "lines"),   
+      # Specify facetting options
+      strip.background = element_rect(fill = "grey30", color = "grey10"),  
+      strip.text.x = element_text(size = base_size*0.8, color = "black"),  
+      strip.text.y = element_text(size = base_size*0.8, color = "black",angle = -90),  
+      # Specify plot options
+      plot.background = element_rect(color = "white", fill = "white"),  
+      plot.title = element_text(size = base_size*1.2, color = "black"),  
+      plot.margin = unit(rep(1, 4), "lines")
+      
+    )
+  
+}
+
+
+ggplot(NULL) + 
+  geom_histogram(data=Glorich, aes(x=NCIB), binwidth=0.01)+
+  theme_white()+
+  scale_x_continuous(limits=c(-0.3,0.3), breaks=round(seq(-0.3,0.3, by=0.1),1))
+  
+```
+
+\noindent Because this is a relatively large database, sometimes a density plot is useful to visualise the data. To plot the individual points creates an unreasonably large file size. Density plots of the chemistry of the water provide an instructive way to constrain some of the mineral dissolution reactions that are occurring at a global scale.
+
+# QUESTION: Given the reaction $NaCl \rightarrow Na^++Cl^-$ comment on the relationship in Fig. 3. Note that you can make Fig. 4 by running the chunk "Na vs Cl".
+
+```{r Na vs Cl, fig.margin = TRUE, warning=FALSE, fig.pos = "-4cm", fig.cap="Na+ vs Cl-, plotted as density"}
+my_breaks = c(1, 10, 100, 1000, 8000)
+ggplot(NULL)+
+  geom_hex(data=Glorich, aes(x=Na, y=Cl))+
+  theme_white()+
+  geom_abline(slope=1, intercept=0)+
+  scale_fill_viridis(trans = "log",
+                        breaks = my_breaks, labels = my_breaks)+
+  theme_white()+
+    theme(
+    legend.position = c(.95, .05),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+        legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.25, 'cm'),
+    legend.title = element_text(size=8), #change legend title font size
+    legend.text = element_text(size=8) #change legend text font size
+    )+
+  scale_x_continuous(name=bquote(bold(Na^`+`)), limits=c(-100, 8000))+
+  scale_y_continuous(name=bquote(bold(Cl^`-`)), limits=c(-100, 8000))
+  
+```
+
+# QUESTION: Given the reaction $CaSO_4H_2O \rightarrow Ca^{2+}+SO_4^{2-}+H_2O$ comment on the relationship in Fig. 4. Note that you can make Fig. 4 by running the chunk "Ca vs SO4".
+
+```{r Ca vs SO4, fig.margin = TRUE, warning=FALSE, fig.pos = "-1cm", fig.cap="Ca2+ vs SO42-, plotted as density"}
+my_breaks = c(1, 10, 100, 1000, 8000)
+ggplot(NULL)+
+  geom_hex(data=Glorich, aes(x=Ca, y=SO4))+
+  theme_white()+
+  geom_abline(slope=1, intercept=0)+
+  geom_abline(slope=2, intercept=0)+
+  scale_fill_viridis(trans = "log",
+                        breaks = my_breaks, labels = my_breaks)+
+  theme_white()+
+    theme(
+    legend.position = c(.95, .05),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+        legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.25, 'cm'),
+    legend.title = element_text(size=8), #change legend title font size
+    legend.text = element_text(size=8) #change legend text font size
+    )+
+  scale_x_continuous(name=bquote(bold(Ca^`2+`)), limits=c(-100, 8000))+
+  scale_y_continuous(name=bquote(bold(SO[4]^`2-`)), limits=c(-100, 8000))
+
+
+```
+
+# QUESTION: Given the reaction $CaCO3+CO_2+2H_2O \rightarrow Ca^{2+}+2HCO_3^-$ comment on the relationship in Fig. 6. What reaction do you think might be responsible for the line with slope 2 on Fig. 5? Note that you can make Fig. 5 by running the chunk "Ca vs HCO3 density".
+
+```{r Ca vs HCO3 density, fig.margin = TRUE, warning=FALSE, fig.pos = "-2cm", fig.cap="Ca2+ vs HCO3-, plotted as density"}
+
+my_breaks = c(1, 10, 100, 1000, 8000)
+ggplot(NULL)+
+  geom_hex(data=Glorich, aes(x=Ca, y=HCO3))+
+  theme_white()+
+  geom_abline(slope=1, intercept=0)+
+  geom_abline(slope=2, intercept=0)+
+  scale_fill_viridis(trans = "log",
+                        breaks = my_breaks, labels = my_breaks)+
+  theme_white()+
+    theme(
+    legend.position = c(.95, .05),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+        legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.25, 'cm'),
+    legend.title = element_text(size=8), #change legend title font size
+    legend.text = element_text(size=8) #change legend text font size
+    )+
+  scale_x_continuous(name=bquote(bold(Ca^`2+`)), limits=c(-100, 8000))+
+  scale_y_continuous(name=bquote(bold(HCO3^`-`)), limits=c(-100, 8000))
+```
+
+# QUESTION: Look at the plot of the Mg/Na vs Ca/Na ratio (Fig. 6). Suggest 1) Why what controls the distribution of these two elemental, and 2) why it is often better to plot an elemental ratio rather than an absolute abundance? Note that you can make Fig. 6 by running the chunk "Gaillardet Mixing plot".
+
+```{r, Gaillardet Mixing plot,  warning=FALSE,  fig.cap="Mg/Na vs Ca/Na ratio, plotted as density"}
+Glorich<-Glorich%>%mutate(`Mg/Na`=Mg/(Na-Cl),
+                           `Ca/Na`=Ca/(Na-Cl))
+
+ggplot(data=Glorich, aes(x=`Ca/Na`, y=`Mg/Na`))+
+  geom_hex()+
+  scale_fill_viridis(trans = "log10",
+                        breaks = my_breaks, labels = my_breaks)+
+  theme_white()+
+    theme(
+    legend.position = c(.95, .05),
+    legend.justification = c("right", "bottom"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6),
+        legend.key.height= unit(0.5, 'cm'),
+    legend.key.width= unit(0.25, 'cm'),
+    legend.title = element_text(size=8), #change legend title font size
+    legend.text = element_text(size=8) #change legend text font size
+    )+
+  scale_x_continuous(name="Ca/Na [Mol:Mol]", limits=c(0.001, 100), trans = "log10")+
+  scale_y_continuous(name="Mg/Na [Mol:Mol]", limits=c(0.001, 100), trans = "log10")
+
+```
+
+\noindent For each station ID in GLORICH there are often multiple samples collected at different points in time. To be able to plot a map of the global chemistry of river waters, it is more efficient to calculate the mean of each sample site.
+
+# TASK: Compute the mean of the the chemical data for each station ID by running the chunk "Compute Glorich means by station ID".
+
+\marginnote{Look at how fast this is to do in a coding envrironment.}
+
+```{r Compute Glorich means by station ID, include=FALSE, echo=FALSE}
+vars<-c("pH","HCO3","Ca","Mg","Na","K","SiO2","Cl","SO4","NO3")
+
+Glorich_station_means<-Glorich%>%group_by(STAT_ID)%>%summarise_at(vars, mean, na.rm=TRUE)
+```
+
+\noindent By combining the GLORICH chemical data with the catchment outline shape files, it should be possible to make a global map of water chemistry.
+
+# TASK: Combine the GLORICH data file with the catchment shape files using the chunk of code "Merge Glorich and sf", using the merge function in R.
+
+\marginnote[-2cm]{Note that there are other ways to merge data files in R, but they don't necessarily preserve the simple features (i.e., the geospatial information) in the file type.}
+
+```{r Merge Glorich and sf, echo=FALSE, include=FALSE}
+
+Glorich_station_means<-merge(Glorich_shape, Glorich_station_means, by="STAT_ID")  # Note this preserves the sf file architecture
+
+```
+
+# TASK: Try making a map of the global distribution of elements in the Glorich database. An example for the Ca/Na ratio is given, but you could try some others. You can make the map by running the chunk "Glorich Chemical Map",
+
+```{r, Glorich Chemical Map, fig.fullwidth=TRUE,  fig.cap="Map showing Cl- in GloRICH database", out.width = "100%", warning=FALSE, message=FALSE}
+Glorich_station_means<-Glorich_station_means%>%mutate(`Mg/Na`=Mg/(Na-Cl),
+                                                      `Ca/Na`=Ca/(Na-Cl))
+
+ggplot(NULL)+
+  geom_sf(data=continents, aes(),alpha=0.1, fill="black", size=0.01)+
+  geom_sf(data=Glorich_station_means, aes(alpha=1, fill=`Ca/Na`), size=0.01)+
+  scale_fill_viridis(trans = "log",
+                        breaks = my_breaks, labels = my_breaks)
+
+```
+
+\noindent The above tasks should have convinced you that there is a global mineralogical (lithological) control. The GLORICH data set is provided with a "properties" file for each catchment that includes the fraction of the major rock types derived from the "GLIM" global geological map. \noindent The catchment properties file contains the station ID's (**"STAT_ID"**) that can be matched to the water chemistry. This enables a direct comparison between geology and water chemistry.
+
+# TASK: Read in the properties file by running the chunk "Glorich properties file"
+
+```{r Glorich properties file, echo=FALSE, include=FALSE}
+Glorich_properties<-read.csv("Glorich_V01_CSV_plus_Shapefiles_2019_05_24/catchment_properties.csv")
+```
+
+# TASK: Take a look at the properties file by running the chunk "Look at Glorich properties file".
+
+```{r Look at Glorich properties file, echo=FALSE, include=FALSE}
+head(Glorich_properties)
+colnames(Glorich_properties)
+```
+
+```{=tex}
+\begin{table}[htp]
+\caption{List of catchment properties from the GloRICH database}
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+Parameter Name& Description\\
+\hline
+ev&Evaporites\\
+ig& Ice and Glaciers\\
+mt& Metamorphic rocks\\
+nd& not defined\\
+pa& Plutonics, acid\\
+pb& Plutonics, basic\\
+pi& Plutonics, intermediate \\
+py& Pyroclastics\\
+sc& Carbonate rocks\\
+sm& Mixed sedimentary rocks \\
+ss& Siliciclastic sedimentary rocks \\
+su& Unconsilidated sediments \\
+va& Volcanics, acid\\
+vb& Volcanics, basic\\
+vi& Volcanics, intermediate \\
+wb& Water bodies\\
+\hline
+\end{tabular}
+\end{center}
+\label{default}
+\end{table}
+```
+# TASK: Select key lithological properties by running the chunk "Select rock types from Glorich properties file".
+
+```{r Select rock types from Glorich properties file, echo=FALSE, include=FALSE}
+Glorich_properties<-Glorich_properties%>%dplyr::select(STAT_ID,Catch_ID,ev,ig,mt,nd,pa,pb,pi,py,sc,sm,ss,su,va,vb,vi,wb,LITHO_CHECKSUM)
+#Filter for checksum
+Glorich_properties<-Glorich_properties%>%filter(LITHO_CHECKSUM==1)
+```
+
+# TASK: Merge together the properties file with the database file by running the chunck "merge properties and the rest of the database".
+```{r merge properties and the rest of the database, echo=FALSE, include=FALSE}
+Glorich<-merge(Glorich,Glorich_properties, by="STAT_ID")
+```
+
+# QUESTION Looking at Fig. 8 and Fig. 9, that plot various chemical parameters from the water chemistry as a function of the surface geology (ev=evaporite, sc= carbonate, vb= mafic igneous) comment on how strong the link is to lithology.  Is this what you expected?  Can you explain the results?  Discuss with a demonstrator.
+
+```{r, GLORICH mixed sed rocks, fig.fullwidth=TRUE,  fig.cap="Link between carbonate rocks and water chemistry?", warning=FALSE, message=FALSE}
+A<-Glorich%>%mutate(`Ca/Si`=Ca/SiO2, 
+                    `Ca/Mg`=Ca/Mg,
+                    `Ca/Na`=Ca/(Na-Cl))%>%
+          dplyr::select(sc,sm,vb,pb, pa, va, vi,`Ca/Si`,`Ca/Mg`,`Ca/Na`)%>%      
+          pivot_longer(c(`Ca/Si`,`Ca/Mg`,`Ca/Na`), names_to = "Ratio", values_to = "Value")
+
+
+ggplot(data=A, aes(x=sc+sm, y=Value))+
+  geom_hex()+
+  facet_wrap(vars(Ratio))+
+  scale_fill_viridis(trans = "log",
+                        breaks = my_breaks, labels = my_breaks)+
+  theme_linedraw()+
+  theme(aspect.ratio=0.8)+
+  theme(legend.position="none")+
+  #scale_x_continuous(trans="log10")+
+  scale_y_continuous(trans="log10", name="Elemental ratio")+
+  scale_x_continuous(name="Fraction of carbonate and mixed sedimentary rocks", limits = c(0,1), breaks=c(0,0.2, 0.4, 0.6, 0.8))
+  
+```
+
+```{r, GLORICH mixed IG rocks, fig.fullwidth=TRUE, fig.cap="Link between silicate rocks and water chemistry?", warning=FALSE, message=FALSE}
+ggplot(data=A, aes(x=vb+pb+pa+va+vi, y=Value))+
+  geom_hex()+
+  facet_wrap(vars(Ratio))+
+  scale_fill_viridis(trans = "log",
+                        breaks = my_breaks, labels = my_breaks)+
+  theme_linedraw()+
+  theme(aspect.ratio=0.8)+
+  theme(legend.position="none")+
+  #scale_x_continuous(trans="log10")+
+  scale_y_continuous(trans="log10", name="Elemental ratio")+
+  scale_x_continuous(name="Fraction of mixed igneous rock", limits = c(0,1), breaks=c(0,0.2, 0.4, 0.6, 0.8))
+
+
+
+```
