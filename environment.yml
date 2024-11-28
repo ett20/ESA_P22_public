@@ -10,13 +10,12 @@ dependencies:
   - r-ggplot2
   - r-readxl
   - r-plotly
-#install.packages(reshape2)
+  - r-reshape2
   - r-gtools
-#install.packages(MASS
-#install.packages(ggridges)
+  - r- MASS
+  - r- ggridges
   - r-pracma
   - r-viridis
   - r-colorspace
   - r-dplyr
   - r-tidyr
-  - r-sf
